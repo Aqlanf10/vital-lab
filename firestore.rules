@@ -1,0 +1,483 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: Default-Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // Hardened Global Primitives
+    // =========================================================================
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'Aqlanf10@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerifiedUser() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isWorkspaceMasterOwner(userId) {
+      return exists(/databases/$(database)/documents/workspaces/$(userId)) &&
+        get(/databases/$(database)/documents/workspaces/$(userId)).data.ownerId == request.auth.uid;
+    }
+
+    function isCaseMasterOwner(userId, caseId) {
+      return isWorkspaceMasterOwner(userId) &&
+        exists(/databases/$(database)/documents/workspaces/$(userId)/cases/$(caseId)) &&
+        get(/databases/$(database)/documents/workspaces/$(userId)/cases/$(caseId)).data.ownerId == request.auth.uid;
+    }
+
+    // =========================================================================
+    // Entity Blueprint Validation Helpers (Synced with firebase-blueprint.json)
+    // =========================================================================
+    function isValidAdminProfile(data) {
+      return data.keys().hasAll(['uid', 'grantedBy', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'grantedBy', 'createdAt']) &&
+        isValidId(data.uid) &&
+        data.grantedBy is string && data.grantedBy.size() >= 1 && data.grantedBy.size() <= 128 &&
+        data.grantedBy == request.auth.uid &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidWorkspace(data) {
+      return data.keys().hasAll(['ownerId', 'labName', 'currency', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'ownerId',
+          'labName',
+          'currency',
+          'secondaryCurrency',
+          'exchangeRate',
+          'taxNumber',
+          'address',
+          'whatsappPhone',
+          'warrantyYears',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.ownerId) &&
+        (data.ownerId == request.auth.uid || isBootstrappedAdmin()) &&
+        data.labName is string && data.labName.size() >= 1 && data.labName.size() <= 120 &&
+        data.currency is string && data.currency.size() >= 1 && data.currency.size() <= 16 &&
+        (!('secondaryCurrency' in data) || (data.secondaryCurrency is string && data.secondaryCurrency.size() >= 1 && data.secondaryCurrency.size() <= 16)) &&
+        (!('exchangeRate' in data) || (data.exchangeRate is number && data.exchangeRate >= 0 && data.exchangeRate <= 1000000)) &&
+        (!('taxNumber' in data) || (data.taxNumber is string && data.taxNumber.size() <= 40)) &&
+        (!('address' in data) || (data.address is string && data.address.size() <= 200)) &&
+        (!('whatsappPhone' in data) || (data.whatsappPhone is string && data.whatsappPhone.size() <= 30)) &&
+        (!('warrantyYears' in data) || (data.warrantyYears is number && data.warrantyYears >= 0 && data.warrantyYears <= 25)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidCloudDentalCase(data) {
+      return data.keys().hasAll([
+          'ownerId',
+          'branchId',
+          'caseCode',
+          'clinicId',
+          'patientName',
+          'serviceType',
+          'units',
+          'shade',
+          'price',
+          'status',
+          'receivedDate',
+          'dueDate',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId',
+          'branchId',
+          'caseCode',
+          'clinicId',
+          'patientName',
+          'serviceType',
+          'units',
+          'shade',
+          'price',
+          'staffId',
+          'status',
+          'receivedDate',
+          'dueDate',
+          'selectedTeeth',
+          'scanFileUrl',
+          'notes',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.ownerId) &&
+        (data.ownerId == request.auth.uid || isBootstrappedAdmin()) &&
+        data.branchId is string && data.branchId.size() >= 1 && data.branchId.size() <= 64 && data.branchId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.caseCode is string && data.caseCode.size() >= 1 && data.caseCode.size() <= 64 && data.caseCode.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.clinicId is string && data.clinicId.size() >= 1 && data.clinicId.size() <= 120 &&
+        data.patientName is string && data.patientName.size() >= 1 && data.patientName.size() <= 120 &&
+        data.serviceType is string && data.serviceType.size() >= 1 && data.serviceType.size() <= 120 &&
+        data.units is number && data.units >= 1 && data.units <= 32 &&
+        data.shade is string && data.shade.size() >= 1 && data.shade.size() <= 20 &&
+        data.price is number && data.price >= 0 && data.price <= 10000000 &&
+        (!('staffId' in data) || (data.staffId is string && data.staffId.size() <= 64)) &&
+        data.status in [
+          'Pending',
+          'Scanning',
+          'Designing',
+          'TryIn_Out',
+          'TryIn_Returned',
+          'Milling',
+          'Sintering',
+          'Finishing',
+          'Ready',
+          'Delivered'
+        ] &&
+        data.receivedDate is string && data.receivedDate.size() >= 8 && data.receivedDate.size() <= 20 &&
+        data.dueDate is string && data.dueDate.size() >= 8 && data.dueDate.size() <= 20 &&
+        (!('selectedTeeth' in data) || (
+          data.selectedTeeth is list &&
+          data.selectedTeeth.size() <= 32 &&
+          (data.selectedTeeth.size() == 0 || data.selectedTeeth[0] is int)
+        )) &&
+        (!('scanFileUrl' in data) || (data.scanFileUrl is string && data.scanFileUrl.size() <= 500)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidCloudCaseMessage(data) {
+      return data.keys().hasAll(['ownerId', 'caseId', 'senderRole', 'senderName', 'body', 'createdAt']) &&
+        data.keys().hasOnly(['ownerId', 'caseId', 'senderRole', 'senderName', 'body', 'createdAt']) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        data.caseId is string && data.caseId.size() >= 1 && data.caseId.size() <= 64 && data.caseId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.senderRole in ['doctor', 'lab'] &&
+        data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 100 &&
+        data.body is string && data.body.size() >= 1 && data.body.size() <= 1000 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidCloudExpense(data) {
+      return data.keys().hasAll(['ownerId', 'branchId', 'category', 'title', 'amount', 'date', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['ownerId', 'branchId', 'category', 'title', 'supplierName', 'amount', 'date', 'createdAt', 'updatedAt']) &&
+        isValidId(data.ownerId) &&
+        (data.ownerId == request.auth.uid || isBootstrappedAdmin()) &&
+        data.branchId is string && data.branchId.size() >= 1 && data.branchId.size() <= 64 && data.branchId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.category in ['materials', 'maintenance', 'rent_utilities', 'logistics', 'admin'] &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+        (!('supplierName' in data) || (data.supplierName is string && data.supplierName.size() <= 120)) &&
+        data.amount is number && data.amount >= 0 && data.amount <= 100000000 &&
+        data.date is string && data.date.size() >= 8 && data.date.size() <= 20 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidCloudCourierOrder(data) {
+      return data.keys().hasAll(['ownerId', 'branchId', 'clinicName', 'direction', 'status', 'caseIds', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['ownerId', 'branchId', 'clinicName', 'direction', 'status', 'courierName', 'caseIds', 'notes', 'createdAt', 'updatedAt']) &&
+        isValidId(data.ownerId) &&
+        (data.ownerId == request.auth.uid || isBootstrappedAdmin()) &&
+        data.branchId is string && data.branchId.size() >= 1 && data.branchId.size() <= 64 && data.branchId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.clinicName is string && data.clinicName.size() >= 1 && data.clinicName.size() <= 120 &&
+        data.direction in ['pickup_impression', 'try_in_dispatch', 'final_delivery'] &&
+        data.status in ['requested', 'assigned', 'in_transit', 'arrived_lab', 'delivered'] &&
+        (!('courierName' in data) || (data.courierName is string && data.courierName.size() <= 100)) &&
+        data.caseIds is list &&
+        data.caseIds.size() <= 20 &&
+        (data.caseIds.size() == 0 || (data.caseIds[0] is string && data.caseIds[0].size() <= 64)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 500)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // Collection 1: /admins/{adminId}
+    // =========================================================================
+    match /admins/{adminId} {
+      allow get: if isVerifiedUser() && isValidId(adminId) && (
+        request.auth.uid == adminId || isBootstrappedAdmin()
+      );
+      allow list: if isBootstrappedAdmin() && existing().uid is string;
+      allow create: if isBootstrappedAdmin() &&
+        isValidId(adminId) &&
+        isValidAdminProfile(incoming()) &&
+        incoming().uid == adminId &&
+        incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isBootstrappedAdmin() && isValidId(adminId);
+    }
+
+    // =========================================================================
+    // Collection 2: /workspaces/{userId} (Master Gate Root)
+    // =========================================================================
+    match /workspaces/{userId} {
+      allow get: if isVerifiedUser() && isValidId(userId) && (
+        (request.auth.uid == userId && existing().ownerId == request.auth.uid) || isAdmin()
+      );
+      allow list: if isVerifiedUser() && (
+        existing().ownerId == request.auth.uid || isBootstrappedAdmin()
+      );
+      allow create: if isVerifiedUser() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        incoming().ownerId == request.auth.uid &&
+        isValidWorkspace(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isValidWorkspace(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            request.auth.uid == userId &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'labName',
+              'currency',
+              'secondaryCurrency',
+              'exchangeRate',
+              'taxNumber',
+              'address',
+              'whatsappPhone',
+              'warrantyYears',
+              'updatedAt'
+            ])
+          )
+        );
+      allow delete: if isVerifiedUser() && isValidId(userId) && isAdmin();
+
+      // =======================================================================
+      // Subcollection 2A: /workspaces/{userId}/cases/{caseId}
+      // =======================================================================
+      match /cases/{caseId} {
+        allow get: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(caseId) && (
+            (request.auth.uid == userId && existing().ownerId == request.auth.uid && isWorkspaceMasterOwner(userId)) ||
+            isAdmin()
+          );
+        allow list: if isVerifiedUser() &&
+          isValidId(userId) && (
+            existing().ownerId == request.auth.uid || isBootstrappedAdmin()
+          );
+        allow create: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(caseId) &&
+          request.auth.uid == userId &&
+          incoming().ownerId == request.auth.uid &&
+          isValidCloudDentalCase(incoming()) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          isWorkspaceMasterOwner(userId);
+        allow update: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(caseId) &&
+          isValidCloudDentalCase(incoming()) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().branchId == existing().branchId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (
+              request.auth.uid == userId &&
+              existing().status != 'Delivered' &&
+              isWorkspaceMasterOwner(userId) &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'status',
+                'staffId',
+                'notes',
+                'scanFileUrl',
+                'updatedAt'
+              ])
+            ) ||
+            (
+              request.auth.uid == userId &&
+              existing().status != 'Delivered' &&
+              isWorkspaceMasterOwner(userId) &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'clinicId',
+                'patientName',
+                'serviceType',
+                'units',
+                'shade',
+                'price',
+                'staffId',
+                'status',
+                'dueDate',
+                'selectedTeeth',
+                'scanFileUrl',
+                'notes',
+                'updatedAt'
+              ])
+            )
+          );
+        allow delete: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(caseId) && (
+            (request.auth.uid == userId && existing().ownerId == request.auth.uid && isWorkspaceMasterOwner(userId)) ||
+            isAdmin()
+          );
+
+        // =====================================================================
+        // Subcollection 2A-1: /workspaces/{userId}/cases/{caseId}/messages/{messageId}
+        // =====================================================================
+        match /messages/{messageId} {
+          allow get: if isVerifiedUser() &&
+            isValidId(userId) &&
+            isValidId(caseId) &&
+            isValidId(messageId) && (
+              (request.auth.uid == userId && existing().ownerId == request.auth.uid && isCaseMasterOwner(userId, caseId)) ||
+              isAdmin()
+            );
+          allow list: if isVerifiedUser() &&
+            isValidId(userId) &&
+            isValidId(caseId) && (
+              existing().ownerId == request.auth.uid || isBootstrappedAdmin()
+            );
+          allow create: if isVerifiedUser() &&
+            isValidId(userId) &&
+            isValidId(caseId) &&
+            isValidId(messageId) &&
+            request.auth.uid == userId &&
+            isValidCloudCaseMessage(incoming()) &&
+            incoming().caseId == caseId &&
+            incoming().createdAt == request.time &&
+            isCaseMasterOwner(userId, caseId);
+          allow update: if false;
+          allow delete: if isVerifiedUser() &&
+            isValidId(userId) &&
+            isValidId(caseId) &&
+            isValidId(messageId) &&
+            isAdmin();
+        }
+      }
+
+      // =======================================================================
+      // Subcollection 2B: /workspaces/{userId}/expenses/{expenseId}
+      // =======================================================================
+      match /expenses/{expenseId} {
+        allow get: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(expenseId) && (
+            (request.auth.uid == userId && existing().ownerId == request.auth.uid && isWorkspaceMasterOwner(userId)) ||
+            isAdmin()
+          );
+        allow list: if isVerifiedUser() &&
+          isValidId(userId) && (
+            existing().ownerId == request.auth.uid || isBootstrappedAdmin()
+          );
+        allow create: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(expenseId) &&
+          request.auth.uid == userId &&
+          incoming().ownerId == request.auth.uid &&
+          isValidCloudExpense(incoming()) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          isWorkspaceMasterOwner(userId);
+        allow update: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(expenseId) &&
+          isValidCloudExpense(incoming()) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().branchId == existing().branchId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (
+              request.auth.uid == userId &&
+              isWorkspaceMasterOwner(userId) &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'category',
+                'title',
+                'supplierName',
+                'amount',
+                'date',
+                'updatedAt'
+              ])
+            )
+          );
+        allow delete: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(expenseId) && (
+            (request.auth.uid == userId && existing().ownerId == request.auth.uid && isWorkspaceMasterOwner(userId)) ||
+            isAdmin()
+          );
+      }
+
+      // =======================================================================
+      // Subcollection 2C: /workspaces/{userId}/couriers/{courierId}
+      // =======================================================================
+      match /couriers/{courierId} {
+        allow get: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(courierId) && (
+            (request.auth.uid == userId && existing().ownerId == request.auth.uid && isWorkspaceMasterOwner(userId)) ||
+            isAdmin()
+          );
+        allow list: if isVerifiedUser() &&
+          isValidId(userId) && (
+            existing().ownerId == request.auth.uid || isBootstrappedAdmin()
+          );
+        allow create: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(courierId) &&
+          request.auth.uid == userId &&
+          incoming().ownerId == request.auth.uid &&
+          isValidCloudCourierOrder(incoming()) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          isWorkspaceMasterOwner(userId);
+        allow update: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(courierId) &&
+          isValidCloudCourierOrder(incoming()) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().branchId == existing().branchId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (
+              request.auth.uid == userId &&
+              existing().status != 'delivered' &&
+              isWorkspaceMasterOwner(userId) &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'status',
+                'courierName',
+                'notes',
+                'updatedAt'
+              ])
+            )
+          );
+        allow delete: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(courierId) && (
+            (request.auth.uid == userId && existing().ownerId == request.auth.uid && isWorkspaceMasterOwner(userId)) ||
+            isAdmin()
+          );
+      }
+    }
+  }
+}

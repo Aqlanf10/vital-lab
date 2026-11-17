@@ -1,0 +1,419 @@
+{
+  "entities": {
+    "AdminProfile": {
+      "title": "AdminProfile",
+      "description": "Trusted administrator registry entry for privilege verification without custom claims.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the administrator."
+        },
+        "grantedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "UID of the bootstrapped admin who granted access."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when admin entry was created."
+        }
+      },
+      "required": ["uid", "grantedBy", "createdAt"]
+    },
+    "Workspace": {
+      "title": "Workspace",
+      "description": "Master Gate workspace document storing multi-branch dental lab identity, currency settings, and warranty policy.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Immutable Firebase Auth UID of the workspace owner."
+        },
+        "labName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Official dental lab name."
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "description": "Primary accounting currency symbol or code."
+        },
+        "secondaryCurrency": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "description": "Secondary currency symbol for dual-currency invoices."
+        },
+        "exchangeRate": {
+          "type": "number",
+          "description": "Exchange rate from primary to secondary currency."
+        },
+        "taxNumber": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "Official tax registration number."
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Headquarters address."
+        },
+        "whatsappPhone": {
+          "type": "string",
+          "maxLength": 30,
+          "description": "Official WhatsApp contact number."
+        },
+        "warrantyYears": {
+          "type": "number",
+          "description": "Default prosthesis warranty duration in years."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": ["ownerId", "labName", "currency", "createdAt", "updatedAt"]
+    },
+    "CloudDentalCase": {
+      "title": "CloudDentalCase",
+      "description": "Synchronized dental lab production case scoped to a workspace and branch.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Immutable owner UID matching parent workspace."
+        },
+        "branchId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Geographic lab branch identifier."
+        },
+        "caseCode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Case reference code (e.g., V-4101)."
+        },
+        "clinicId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Contracted clinic name or reference."
+        },
+        "patientName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Patient full name."
+        },
+        "serviceType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Prosthesis service type."
+        },
+        "units": {
+          "type": "number",
+          "description": "Number of restoration units."
+        },
+        "shade": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "description": "VITA tooth shade code."
+        },
+        "price": {
+          "type": "number",
+          "description": "Net billed price."
+        },
+        "staffId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Assigned technician ID."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Pending",
+            "Scanning",
+            "Designing",
+            "TryIn_Out",
+            "TryIn_Returned",
+            "Milling",
+            "Sintering",
+            "Finishing",
+            "Ready",
+            "Delivered"
+          ],
+          "description": "Current manufacturing or clinical Try-In stage."
+        },
+        "receivedDate": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 20,
+          "description": "Case receipt date."
+        },
+        "dueDate": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 20,
+          "description": "Target delivery date."
+        },
+        "selectedTeeth": {
+          "type": "array",
+          "description": "Bounded FDI tooth numbers list (max 32)."
+        },
+        "scanFileUrl": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "External 3D intraoral scan link (STL/3Shape/Medit)."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Clinical and occlusal instructions."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "ownerId",
+        "branchId",
+        "caseCode",
+        "clinicId",
+        "patientName",
+        "serviceType",
+        "units",
+        "shade",
+        "price",
+        "status",
+        "receivedDate",
+        "dueDate",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CloudCaseMessage": {
+      "title": "CloudCaseMessage",
+      "description": "Direct clinical message in a case subcollection between Doctor and Lab.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Immutable workspace owner UID."
+        },
+        "caseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Parent case ID."
+        },
+        "senderRole": {
+          "type": "string",
+          "enum": ["doctor", "lab"],
+          "description": "Originating portal role."
+        },
+        "senderName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Display name of message author."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "Clinical comment text."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        }
+      },
+      "required": ["ownerId", "caseId", "senderRole", "senderName", "body", "createdAt"]
+    },
+    "CloudExpense": {
+      "title": "CloudExpense",
+      "description": "Operating expense or supplier purchase entry for branch P&L accounting.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Immutable workspace owner UID."
+        },
+        "branchId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Branch ID."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["materials", "maintenance", "rent_utilities", "logistics", "admin"],
+          "description": "Expense classification."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Expense summary."
+        },
+        "supplierName": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Optional supplier or vendor name."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Expense amount in primary currency."
+        },
+        "date": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 20,
+          "description": "Accounting date YYYY-MM-DD."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": ["ownerId", "branchId", "category", "title", "amount", "date", "createdAt", "updatedAt"]
+    },
+    "CloudCourierOrder": {
+      "title": "CloudCourierOrder",
+      "description": "Courier pickup, Try-In delivery, or final prosthesis dispatch task.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Immutable workspace owner UID."
+        },
+        "branchId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Branch ID."
+        },
+        "clinicName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Target clinic name."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["pickup_impression", "try_in_dispatch", "final_delivery"],
+          "description": "Logistics task type."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["requested", "assigned", "in_transit", "arrived_lab", "delivered"],
+          "description": "Dispatch status."
+        },
+        "courierName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Assigned courier name."
+        },
+        "caseIds": {
+          "type": "array",
+          "description": "Bounded list of associated case IDs (max 20)."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Pickup/delivery notes."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": ["ownerId", "branchId", "clinicName", "direction", "status", "caseIds", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminProfile" },
+      "description": "Trusted administrator UIDs managed solely by the bootstrapped super admin."
+    },
+    "/workspaces/{userId}": {
+      "schema": { "$ref": "#/entities/Workspace" },
+      "description": "Master Gate workspace root document per authenticated owner."
+    },
+    "/workspaces/{userId}/cases/{caseId}": {
+      "schema": { "$ref": "#/entities/CloudDentalCase" },
+      "description": "Dental cases synchronized under the workspace."
+    },
+    "/workspaces/{userId}/cases/{caseId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/CloudCaseMessage" },
+      "description": "Subcollection of clinical chat messages per case."
+    },
+    "/workspaces/{userId}/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/CloudExpense" },
+      "description": "Subcollection of operating expenses and supplier bills."
+    },
+    "/workspaces/{userId}/couriers/{courierId}": {
+      "schema": { "$ref": "#/entities/CloudCourierOrder" },
+      "description": "Subcollection of courier pickup and delivery orders."
+    }
+  }
+}
